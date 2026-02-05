@@ -5,3 +5,4 @@ yfinance
 numpy
 streamlit
 python-dotenv
+altair<5
