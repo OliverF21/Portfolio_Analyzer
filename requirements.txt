@@ -3,5 +3,8 @@ pydantic
 pandas
 yfinance
 numpy
-streamlit
+plotly
 python-dotenv
+streamlit>=1.42.0
+altair<6
+
