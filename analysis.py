@@ -3,15 +3,19 @@ import pandas as pd
 import numpy as np
 
 def calculate_risk_metrics(df):
-    """Calculates CAGR (True Annual Return) and Volatility."""
+    """
+    Calculates 'Standard' 3-Year Sharpe using Monthly Returns.
+    This matches Morningstar/Yahoo methodology better than daily data.
+    """
     if df.empty or 'ticker' not in df.columns:
         return pd.DataFrame()
 
     metrics = []
     tickers = df['ticker'].tolist()
     
+    # 1. Fetch 3 Years of Data (Standard Window)
     try:
-        data = yf.download(tickers, period="2y", group_by='ticker', progress=False)
+        data = yf.download(tickers, period="3y", group_by='ticker', progress=False)
     except:
         return pd.DataFrame()
 
@@ -23,29 +27,26 @@ def calculate_risk_metrics(df):
             else:
                 hist = data['Close']
             
-            hist = hist.dropna()
-            if len(hist) < 60: continue
-
-            # --- MATH FIX ---
-            # 1. Volatility (Standard Deviation of Daily Returns)
-            daily_rets = hist.pct_change().dropna()
-            ann_vol = daily_rets.std() * np.sqrt(252)
-
-            # 2. CAGR (Geometric Mean / Compound Growth) - The "True" Return
-            # Formula: (End_Price / Start_Price) ^ (365.25 / Days) - 1
-            start_price = hist.iloc[0]
-            end_price = hist.iloc[-1]
-            days = (hist.index[-1] - hist.index[0]).days
+            # 2. Resample to Monthly (The "Standard" Way)
+            # We take the last price of each month to smooth out daily noise
+            hist_monthly = hist.resample('ME').last().dropna()
             
-            if days > 0 and start_price > 0:
-                cagr = (end_price / start_price) ** (365.25 / days) - 1
-            else:
-                cagr = 0.0
+            # Need at least 24 months for a valid 3Y metric (allow some buffer)
+            if len(hist_monthly) < 24:
+                # Fallback to daily if monthly data is too sparse (e.g., new IPO)
+                metrics.append({"ticker": t, "sharpe": 0.0, "volatility": 0.0, "annual_return": 0.0})
+                continue
 
-            # 3. Sharpe Ratio (Using CAGR as the Return metric)
-            # Assuming 4% Risk-Free Rate
+            # 3. Calculate Monthly Returns
+            monthly_rets = hist_monthly.pct_change().dropna()
+            
+            # 4. Annualize (x12 instead of x252)
+            ann_return = monthly_rets.mean() * 12
+            ann_vol = monthly_rets.std() * np.sqrt(12)
+            
+            # 5. Sharpe (Risk Free Rate = 4% default)
             if ann_vol > 0:
-                sharpe = (cagr - 0.04) / ann_vol
+                sharpe = (ann_return - 0.04) / ann_vol
             else:
                 sharpe = 0.0
             
@@ -53,10 +54,10 @@ def calculate_risk_metrics(df):
                 "ticker": t,
                 "sharpe": float(sharpe),
                 "volatility": float(ann_vol),
-                "annual_return": float(cagr)
+                "annual_return": float(ann_return)
             })
             
-        except:
+        except Exception as e:
             metrics.append({"ticker": t, "sharpe": 0.0, "volatility": 0.0, "annual_return": 0.0})
             
     return pd.DataFrame(metrics)
