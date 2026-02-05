@@ -13,10 +13,10 @@ from analysis import calculate_risk_metrics
 st.set_page_config(page_title="Modular Portfolio Analyzer", layout="wide")
 load_dotenv()
 
-# --- SIDEBAR CONTROLS ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.header("⚙️ Configuration")
-    manual_mode = st.toggle("📝 Manual Data Mode", value=True)
+    manual_mode = st.toggle("📝 Manual Data / CSV Mode", value=True)
     
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key and "GEMINI_API_KEY" in st.secrets:
@@ -28,19 +28,20 @@ with st.sidebar:
 # --- MAIN UI ---
 st.title("🧩 Modular Portfolio Analyzer")
 
-# PHASE 1: DATA ENTRY
 raw_holdings = []
 
+# PHASE 1: DATA ENTRY
 if manual_mode:
-    st.info("Paste your portfolio CSV below (Ticker, Quantity).")
+    st.info("Edit your portfolio CSV below (Ticker, Quantity).")
     csv_input = st.text_area("CSV Data", value=get_example_csv(), height=200)
+    
     if st.button("🚀 Load Manual Data"):
-        raw_holdings = parse_manual_data(csv_input)
-        if not raw_holdings:
-            st.error("Could not parse CSV. Check format.")
-            st.stop()
-        st.success(f"Loaded {len(raw_holdings)} rows from CSV.")
-        
+        with st.spinner("Parsing CSV..."):
+            raw_holdings = parse_manual_data(csv_input)
+            if not raw_holdings:
+                st.error("Could not parse CSV. Please check format.")
+                st.stop()
+            st.success(f"Loaded {len(raw_holdings)} rows from CSV.")
 else:
     uploaded_file = st.file_uploader("Upload Robinhood PDF", type="pdf")
     if uploaded_file:
@@ -88,6 +89,7 @@ if raw_holdings:
     
     k1, k2, k3 = st.columns(3)
     k1.metric("Portfolio Sharpe", f"{weighted_sharpe:.2f}")
+    
     if not final_df.empty:
         best = final_df.loc[final_df['sharpe'].idxmax()]
         k2.metric("Best Asset", best['ticker'], f"{best['sharpe']:.2f}")

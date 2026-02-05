@@ -3,46 +3,49 @@ import pandas as pd
 import numpy as np
 
 def calculate_risk_metrics(df):
-    """
-    Takes the Portfolio DF and enriches it with Risk Metrics (Sharpe, Vol, Return).
-    """
+    """Calculates CAGR (True Annual Return) and Volatility."""
     if df.empty or 'ticker' not in df.columns:
         return pd.DataFrame()
 
     metrics = []
     tickers = df['ticker'].tolist()
     
-    # 1. Fetch History (2 Years)
     try:
         data = yf.download(tickers, period="2y", group_by='ticker', progress=False)
     except:
-        return pd.DataFrame() # Return empty if fetch fails
+        return pd.DataFrame()
 
-    # 2. Iterate and Calculate
     for t in tickers:
         try:
-            # Handle Multi-Index safely
+            # Handle Data Structure
             if len(tickers) > 1:
                 hist = data[t]['Close']
             else:
                 hist = data['Close']
             
             hist = hist.dropna()
-            
-            # Need at least 3 months of data
-            if len(hist) < 60:
-                raise ValueError("Insufficient Data")
+            if len(hist) < 60: continue
 
-            # Daily Returns
-            returns = hist.pct_change().dropna()
+            # --- MATH FIX ---
+            # 1. Volatility (Standard Deviation of Daily Returns)
+            daily_rets = hist.pct_change().dropna()
+            ann_vol = daily_rets.std() * np.sqrt(252)
+
+            # 2. CAGR (Geometric Mean / Compound Growth) - The "True" Return
+            # Formula: (End_Price / Start_Price) ^ (365.25 / Days) - 1
+            start_price = hist.iloc[0]
+            end_price = hist.iloc[-1]
+            days = (hist.index[-1] - hist.index[0]).days
             
-            # Annualize
-            ann_return = returns.mean() * 252
-            ann_vol = returns.std() * np.sqrt(252)
-            
-            # Sharpe (4% Risk Free Rate)
+            if days > 0 and start_price > 0:
+                cagr = (end_price / start_price) ** (365.25 / days) - 1
+            else:
+                cagr = 0.0
+
+            # 3. Sharpe Ratio (Using CAGR as the Return metric)
+            # Assuming 4% Risk-Free Rate
             if ann_vol > 0:
-                sharpe = (ann_return - 0.04) / ann_vol
+                sharpe = (cagr - 0.04) / ann_vol
             else:
                 sharpe = 0.0
             
@@ -50,16 +53,10 @@ def calculate_risk_metrics(df):
                 "ticker": t,
                 "sharpe": float(sharpe),
                 "volatility": float(ann_vol),
-                "annual_return": float(ann_return)
+                "annual_return": float(cagr)
             })
             
         except:
-            # Safe Fallback
-            metrics.append({
-                "ticker": t, 
-                "sharpe": 0.0, 
-                "volatility": 0.0, 
-                "annual_return": 0.0
-            })
+            metrics.append({"ticker": t, "sharpe": 0.0, "volatility": 0.0, "annual_return": 0.0})
             
     return pd.DataFrame(metrics)

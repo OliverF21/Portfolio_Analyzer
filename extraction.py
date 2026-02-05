@@ -1,6 +1,6 @@
+import pdfplumber
 import pandas as pd
 import io
-import pdfplumber
 import json
 import os
 from google import genai
@@ -18,33 +18,26 @@ TSLA, 15
 JPM, 25"""
 
 def parse_manual_data(csv_text):
-    """
-    Parses raw CSV text into the standard list-of-dicts format.
-    """
+    """Parses raw CSV text into the standard list-of-dicts format."""
     try:
-        # Read CSV from string
         df = pd.read_csv(io.StringIO(csv_text))
         
-        # Normalize headers (lowercase, strip spaces)
+        # Normalize headers
         df.columns = [c.lower().strip() for c in df.columns]
         
-        # specific mapping for common variations
-        if 'symbol' in df.columns: df.rename(columns={'symbol': 'ticker'}, inplace=True)
-        if 'qty' in df.columns: df.rename(columns={'qty': 'quantity'}, inplace=True)
-        if 'shares' in df.columns: df.rename(columns={'shares': 'quantity'}, inplace=True)
+        # Map common header variations
+        rename_map = {'symbol': 'ticker', 'qty': 'quantity', 'shares': 'quantity'}
+        df.rename(columns=rename_map, inplace=True)
         
         if 'ticker' not in df.columns or 'quantity' not in df.columns:
             return []
 
         return df[['ticker', 'quantity']].to_dict('records')
-    except Exception as e:
-        print(f"CSV Parse Error: {e}")
+    except Exception:
         return []
 
 def extract_holdings_from_pdf(file_obj, api_key=None):
-    """
-    Extracts raw holding data from a PDF file object using Gemini.
-    """
+    """Extracts raw holding data from a PDF file object using Gemini."""
     try:
         full_text = ""
         with pdfplumber.open(file_obj) as pdf:
