@@ -5,13 +5,14 @@ import numpy as np
 import plotly.express as px
 import pdfplumber
 import os
+import time
 from google import genai
 from google.genai import types
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="AI Portfolio Analyzer (Failsafe)", layout="wide")
+st.set_page_config(page_title="AI Portfolio Analyzer (Final)", layout="wide")
 load_dotenv()
 
 # --- 1. SETUP ---
@@ -24,132 +25,150 @@ api_key = get_api_key()
 if api_key:
     client = genai.Client(api_key=api_key)
 else:
-    client = None # Allow app to load even without key (for Demo Mode)
+    client = None
 
-# --- 2. LOGIC ---
+# --- 2. ROBUST DATA FETCHING (Fixes the Risk Metric Crash) ---
+def get_safe_history(ticker):
+    """Fetches history 1-by-1 to avoid MultiIndex crashes."""
+    try:
+        # Fetch 2 years of data
+        df = yf.Ticker(ticker).history(period="2y")
+        if df.empty: return None
+        return df['Close']
+    except:
+        return None
+
 def get_mock_data():
-    """Returns fake data if the API fails, so the app doesn't crash."""
     return pd.DataFrame([
-        {"ticker": "AAPL", "quantity": 50, "Source": "Demo"},
-        {"ticker": "NVDA", "quantity": 20, "Source": "Demo"},
-        {"ticker": "MSFT", "quantity": 35, "Source": "Demo"},
-        {"ticker": "GOOGL", "quantity": 40, "Source": "Demo"},
-        {"ticker": "TSLA", "quantity": 15, "Source": "Demo"},
-        {"ticker": "VOO", "quantity": 100, "Source": "Demo"}
+        {"ticker": "AAPL", "quantity": 50, "Value": 8500},
+        {"ticker": "NVDA", "quantity": 10, "Value": 9000},
+        {"ticker": "MSFT", "quantity": 20, "Value": 8000},
+        {"ticker": "JPM", "quantity": 30, "Value": 5000}
     ])
 
-# --- 3. MAIN APP ---
-st.title("🛡️ AI Portfolio Analyzer (Failsafe Mode)")
-st.markdown("This version will **switch to Demo Data** if the AI fails, ensuring you always see results.")
+# --- 3. DATA MODELS ---
+class Holding(BaseModel):
+    ticker: str
+    quantity: float
 
+class Portfolio(BaseModel):
+    holdings: list[Holding]
+
+# --- 4. MAIN APP ---
+st.title("🛡️ AI Portfolio Analyzer (Robust)")
+st.markdown("""
+**Status:** Running. 
+If your PDF is a **scan (image)**, text extraction will fail. 
+Switch to **'Force Vision Mode'** below if that happens.
+""")
+
+use_vision = st.toggle("Force Vision Mode (Best for Scanned PDFs)", value=False)
 uploaded_file = st.file_uploader("Upload Monthly Statement", type="pdf")
 
 if uploaded_file:
     df = pd.DataFrame()
     
-    # --- ATTEMPT EXTRACTION ---
-    with st.status("Analyzing Document...", expanded=True) as status:
+    with st.status("Processing...", expanded=True) as status:
         try:
-            # A. Check API Key
-            if not client:
-                raise Exception("No API Key found.")
+            if not client: raise Exception("No API Key found.")
 
-            # B. Extract Text
-            st.write("📄 Reading PDF text locally...")
-            full_text = ""
-            with pdfplumber.open(uploaded_file) as pdf:
-                for page in pdf.pages:
-                    text = page.extract_text()
-                    if text: full_text += text + "\n"
-            
-            if len(full_text) < 50:
-                raise Exception("No text found in PDF (Is it a scanned image?).")
-            
-            # C. Call Gemini (Lite Mode)
-            st.write(f"🧠 Sending {len(full_text)} chars to Gemini 1.5-Flash...")
-            
-            prompt = f"""
-            Extract stock holdings from this text. Ignore cash.
-            Return JSON with 'holdings': list of {{ticker, quantity}}.
-            TEXT: {full_text[:30000]} 
-            """ 
-            # Note: Truncated to 30k chars to prevent token overflow
-
-            response = client.models.generate_content(
-                model="gemini-1.5-flash",
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json"
-                )
-            )
-            
-            # Parse Response
-            import json
-            data = json.loads(response.text)
-            df = pd.DataFrame(data.get('holdings', []))
-            
-            if df.empty:
-                raise Exception("AI returned empty list.")
+            # PATH A: VISION MODE (For Scans)
+            if use_vision:
+                st.write("👁️ Using Vision API (Slower but reads images)...")
+                import tempfile
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                    tmp.write(uploaded_file.getvalue())
+                    tmp_path = tmp.name
                 
-            status.update(label="✅ Success! Real data extracted.", state="complete", expanded=False)
+                try:
+                    f = client.files.upload(file=tmp_path)
+                    time.sleep(2) # Give it a second to process
+                    
+                    response = client.models.generate_content(
+                        model="gemini-1.5-flash",
+                        contents=[f, "Extract all stock holdings (Ticker, Quantity) as JSON."],
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=Portfolio
+                        )
+                    )
+                    data = response.parsed.holdings
+                    df = pd.DataFrame([h.dict() for h in data])
+                finally:
+                    os.remove(tmp_path)
+
+            # PATH B: TEXT MODE (Cheaper, fails on scans)
+            else:
+                st.write("📄 Extracting text locally...")
+                full_text = ""
+                with pdfplumber.open(uploaded_file) as pdf:
+                    for page in pdf.pages:
+                        text = page.extract_text()
+                        if text: full_text += text + "\n"
+                
+                if len(full_text) < 50:
+                    raise Exception("No text found. PDF is likely a scan. Enable 'Force Vision Mode'.")
+
+                st.write(f"🧠 Analyzing {len(full_text)} characters...")
+                response = client.models.generate_content(
+                    model="gemini-1.5-flash",
+                    contents=f"Extract holdings from this text to JSON: {full_text[:30000]}",
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=Portfolio
+                    )
+                )
+                data = response.parsed.holdings
+                df = pd.DataFrame([h.dict() for h in data])
+
+            if df.empty: raise Exception("AI found no data.")
+            status.update(label="✅ Success!", state="complete", expanded=False)
 
         except Exception as e:
-            # --- FALLBACK MECHANISM ---
-            st.warning(f"⚠️ Extraction Error: {str(e)}")
-            st.info("📉 Switching to DEMO DATA so you can verify the visualization logic.")
+            st.error(f"Error: {str(e)}")
+            st.warning("⚠️ Using DEMO DATA due to error.")
             df = get_mock_data()
             status.update(label="⚠️ Using Demo Data", state="error", expanded=False)
 
-    # --- VISUALIZATION (Runs for both Real AND Demo data) ---
+    # --- VISUALIZATION ---
     st.divider()
-    
     if not df.empty:
-        # 1. Fetch Prices
-        with st.spinner("Fetching market data..."):
-            tickers = df['ticker'].unique().tolist()
+        # 1. Get Prices (Simple Loop)
+        with st.spinner("Fetching Prices..."):
+            if 'Value' not in df.columns: # Calculate if not mock
+                prices = []
+                for t in df['ticker']:
+                    try:
+                        p = yf.Ticker(t).history(period="1d")['Close'].iloc[-1]
+                        prices.append(p)
+                    except:
+                        prices.append(0.0)
+                df['Price'] = prices
+                df['Value'] = df['quantity'] * df['Price']
             
-            # Safe Price Fetcher
-            current_prices = {}
-            for t in tickers:
-                try:
-                    price = yf.Ticker(t).history(period="1d")['Close'].iloc[-1]
-                    current_prices[t] = price
-                except:
-                    current_prices[t] = 150.0 # Dummy price if yfinance fails
+            # Clean
+            df = df[df['Value'] > 0].copy()
+            total_val = df['Value'].sum()
+
+        # 2. Display
+        c1, c2 = st.columns([1,2])
+        c1.dataframe(df[['ticker', 'quantity', 'Value']].style.format({"Value": "${:,.2f}"}))
+        c1.metric("Total Value", f"${total_val:,.2f}")
+        c2.plotly_chart(px.pie(df, values='Value', names='ticker', title="Allocation"), use_container_width=True)
+
+        # 3. Risk Metrics (The Fix)
+        st.subheader("📉 Risk Analysis")
+        with st.spinner("Calculating Risk (1-by-1)..."):
+            risk_rows = []
+            for t in df['ticker'].unique():
+                hist = get_safe_history(t)
+                if hist is not None and len(hist) > 100:
+                    ret = hist.pct_change().mean() * 252
+                    vol = hist.pct_change().std() * np.sqrt(252)
+                    sharpe = (ret - 0.04) / vol if vol > 0 else 0
+                    risk_rows.append({"Ticker": t, "Sharpe": sharpe, "Volatility": vol})
+                else:
+                    risk_rows.append({"Ticker": t, "Sharpe": 0.0, "Volatility": 0.0})
             
-            df['Price'] = df['ticker'].map(current_prices)
-            df['Value'] = df['quantity'] * df['Price']
-            total_value = df['Value'].sum()
-            df['Weight'] = df['Value'] / total_value
-
-        # 2. Display Dashboard
-        col1, col2 = st.columns([1, 2])
-        
-        with col1:
-            st.subheader("📋 Holdings")
-            st.dataframe(df[['ticker', 'quantity', 'Value']].style.format({"Value": "${:,.2f}"}))
-            st.metric("Total Value", f"${total_value:,.2f}")
-
-        with col2:
-            st.subheader("🍰 Allocation")
-            fig = px.pie(df, values='Value', names='ticker', title='Portfolio Weighting')
-            st.plotly_chart(fig, use_container_width=True)
-
-        # 3. Risk Analysis
-        st.subheader("📉 Risk Metrics (10y History)")
-        hist_data = yf.download(tickers, period="2y", group_by='ticker', progress=False)
-        
-        # Simple Risk Calculation for Display
-        risk_data = []
-        for t in tickers:
-            try:
-                # Handle yfinance multi-index vs single-index
-                data = hist_data[t]['Close'] if len(tickers) > 1 else hist_data['Close']
-                ret = data.pct_change().mean() * 252
-                vol = data.pct_change().std() * np.sqrt(252)
-                sharpe = (ret - 0.04) / vol
-                risk_data.append({"Ticker": t, "Sharpe": sharpe, "Volatility": vol})
-            except:
-                risk_data.append({"Ticker": t, "Sharpe": 1.2, "Volatility": 0.2}) # Demo fallback
-        
-        st.dataframe(pd.DataFrame(risk_data).style.format("{:.2f}"))
+            risk_df = pd.DataFrame(risk_rows)
+            st.dataframe(risk_df.style.format("{:.2f}"))
