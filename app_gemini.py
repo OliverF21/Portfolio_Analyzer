@@ -4,11 +4,47 @@ from pydantic import BaseModel, Field
 import pandas as pd
 import yfinance as yf
 import numpy as np
+import streamlit as st
 import os
+from google import genai
 from dotenv import load_dotenv
 
-load_dotenv() # This loads the variables from .env
+# Load local .env file (only works on your Mac, ignored on Cloud)
+load_dotenv()
 
+# --- SECURE API KEY RETRIEVAL ---
+def get_api_key():
+    # 1. Try Streamlit Cloud Secrets first
+    if "GEMINI_API_KEY" in st.secrets:
+        return st.secrets["GEMINI_API_KEY"]
+    
+    # 2. Try Local Environment Variable (for your Mac)
+    env_key = os.getenv("GEMINI_API_KEY")
+    if env_key:
+        return env_key
+        
+    # 3. If neither is found, stop the app with instructions
+    return None
+
+api_key = get_api_key()
+
+if not api_key:
+    st.error("🚨 API Key Not Found!")
+    st.markdown("""
+    **To fix this:**
+    1. Go to your **Streamlit App Dashboard**.
+    2. Click **Manage App** -> **Settings** (dots icon) -> **Secrets**.
+    3. Paste this exactly:
+    ```toml
+    GEMINI_API_KEY = "your_actual_key_here"
+    ```
+    """)
+    st.stop()
+
+# Configure the Gemini Client
+client = genai.Client(api_key=api_key)
+
+# ... Rest of your app code below ...
 
 # 1. Setup Client
 client = genai.Client(api_key = os.getenv("GEMINI_API_KEY")) # Replace with your actual key
