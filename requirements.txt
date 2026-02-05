@@ -1,5 +1,7 @@
-streamlit
-pdfplumber
+google-genai>=1.0.0
+pydantic
 pandas
 yfinance
 numpy
+streamlit
+python-dotenv

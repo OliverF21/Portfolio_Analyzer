@@ -4,9 +4,14 @@ from pydantic import BaseModel, Field
 import pandas as pd
 import yfinance as yf
 import numpy as np
+import os
+from dotenv import load_dotenv
+
+load_dotenv() # This loads the variables from .env
+
 
 # 1. Setup Client
-client = genai.Client(api_key="YOUR_GEMINI_API_KEY") # Replace with your actual key
+client = genai.Client(api_key = os.getenv("GEMINI_API_KEY")) # Replace with your actual key
 MODEL_ID = "gemini-2.0-flash" 
 
 # 2. Define the Schema (Structured Output)
