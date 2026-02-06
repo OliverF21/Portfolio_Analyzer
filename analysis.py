@@ -8,7 +8,7 @@ def calculate_risk_metrics(df):
     1. Returns: Geometric Mean of Daily Returns (Annualized).
     2. Volatility: Standard Deviation of Daily Returns (Annualized).
     3. Risk-Free Rate: Fixed at 4.26%.
-    4. Data: Up to 10 Years of History (for reliable long-term estimates).
+    4. Data: 5 Years of History (Balanced lookback).
     """
     if df.empty or 'ticker' not in df.columns:
         return pd.DataFrame()
@@ -16,11 +16,11 @@ def calculate_risk_metrics(df):
     metrics = []
     tickers = df['ticker'].tolist()
     
-    # 1. Fetch 10 Years of DAILY Data
+    # 1. Fetch 5 Years of DAILY Data
     try:
         data = yf.download(
             tickers, 
-            period="10y",   # <--- UPDATED: 10 Years
+            period="5y",    # <--- UPDATED: 5 Years
             group_by='ticker', 
             auto_adjust=True, # Total Return
             progress=False
@@ -39,7 +39,7 @@ def calculate_risk_metrics(df):
             # Drop missing data
             hist = hist.dropna()
             
-            # Need meaningful history (at least ~1 year)
+            # Need meaningful history
             if len(hist) < 200: 
                 raise ValueError("Insufficient Data")
 
@@ -48,7 +48,6 @@ def calculate_risk_metrics(df):
             
             # --- STEP 2: GEOMETRIC MEAN (Conservatism) ---
             # Formula: exp(mean(log(1 + r))) - 1
-            # Using numpy to avoid scipy dependency
             daily_geo_mean = np.exp(np.mean(np.log(1 + daily_rets))) - 1
             
             # Annualize: (1 + daily_geo)^252 - 1
@@ -99,8 +98,8 @@ def get_portfolio_history(df):
     quantities = dict(zip(df['ticker'], df['quantity']))
     
     try:
-        # Fetch 2y daily history for the chart (Visualization purposes)
-        # Note: We keep chart at 2y to avoid visual noise from newer assets (like NVDY) dropping to 0
+        # Fetch 2y daily history for the chart (Visualization)
+        # We keep the chart shorter (2y) to avoid visual clutter from new IPOs dropping to 0
         data = yf.download(tickers, period="2y", auto_adjust=True, progress=False)['Close']
         
         # Handle single ticker case
