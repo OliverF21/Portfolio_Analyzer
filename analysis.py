@@ -120,4 +120,3 @@ def get_portfolio_history(df):
     except Exception as e:
         print(f"History fetch error: {e}")
         return pd.Series()
-    
