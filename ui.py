@@ -51,6 +51,36 @@ def apply_custom_style():
             margin-top: 0.5rem;
             font-size: 1.1rem;
         }
+
+        /* ASSET CARDS */
+        .asset-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+        .asset-ticker {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #111827;
+            margin-bottom: 5px;
+        }
+        .asset-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #4338ca;
+        }
+        .asset-weight {
+            font-size: 0.9rem;
+            color: #6b7280;
+            background-color: #f3f4f6;
+            padding: 4px 10px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 8px;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -63,4 +93,20 @@ def display_header():
         </div>
     """, unsafe_allow_html=True)
 
+def display_top_assets(df):
+    """Renders the top 4 assets as visual cards."""
+    if df.empty: return
     
+    # Sort by weight descending and take top 4
+    top_assets = df.sort_values('weight', ascending=False).head(4)
+    
+    cols = st.columns(4)
+    for idx, (index, row) in enumerate(top_assets.iterrows()):
+        with cols[idx]:
+            st.markdown(f"""
+            <div class="asset-card">
+                <div class="asset-ticker">{row['ticker']}</div>
+                <div class="asset-value">${row['value']:,.0f}</div>
+                <div class="asset-weight">{row['weight']:.1%} of Portfolio</div>
+            </div>
+            """, unsafe_allow_html=True)

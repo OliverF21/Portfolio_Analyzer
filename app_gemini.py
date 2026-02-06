@@ -5,7 +5,7 @@ import os
 from dotenv import load_dotenv
 
 # MODULE IMPORTS
-from ui import apply_custom_style, display_header
+from ui import apply_custom_style, display_header, display_top_assets
 from extraction import extract_holdings_from_pdf, parse_manual_data, get_example_csv
 from processing import create_portfolio_df
 from analysis import calculate_risk_metrics, get_comparative_performance
@@ -73,17 +73,52 @@ if raw_holdings:
     tab1, tab2, tab3 = st.tabs(["📊 Overview", "📈 Price Performance", "🔬 Deep Dive"])
 
     with tab1:
-        c1, c2 = st.columns([1.5, 1])
+        # HERO SECTION: TOP ASSETS
+        st.caption("🏆 Top Positions")
+        display_top_assets(final_df)
+        st.markdown("<br>", unsafe_allow_html=True) # Spacer
+
+        # SPLIT VIEW: RICH TABLE & ALLOCATION
+        c1, c2 = st.columns([2, 1])
         with c1:
-            st.subheader("Holdings Breakdown")
+            st.subheader("All Holdings")
+            
+            # IMPROVED TABLE UI
             st.dataframe(
-                final_df[['ticker', 'quantity', 'value', 'weight']].style.format({
-                    "value": "${:,.2f}", "weight": "{:.1%}"
-                }), use_container_width=True, height=400
+                final_df,
+                column_config={
+                    "ticker": st.column_config.TextColumn("Asset", help="Stock Ticker"),
+                    "value": st.column_config.NumberColumn(
+                        "Market Value",
+                        help="Current Value in USD",
+                        format="$%.2f"
+                    ),
+                    "weight": st.column_config.ProgressColumn(
+                        "Allocation",
+                        help="Portfolio Weight",
+                        format="%.1f%%",
+                        min_value=0,
+                        max_value=1,
+                    ),
+                    "quantity": st.column_config.NumberColumn(
+                        "Shares",
+                        format="%.4f"
+                    ),
+                    "price": st.column_config.NumberColumn(
+                        "Price",
+                        format="$%.2f"
+                    )
+                },
+                column_order=("ticker", "weight", "value", "quantity", "price"),
+                hide_index=True,
+                use_container_width=True,
+                height=450
             )
+        
         with c2:
             st.subheader("Allocation")
-            fig = px.pie(final_df, values='value', names='ticker', hole=0.4, color_discrete_sequence=px.colors.qualitative.Plotly)
+            fig = px.pie(final_df, values='value', names='ticker', hole=0.5, color_discrete_sequence=px.colors.qualitative.Plotly)
+            fig.update_layout(showlegend=False) # Cleaner look
             st.plotly_chart(fig, use_container_width=True)
 
     with tab2:
