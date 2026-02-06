@@ -1,15 +1,12 @@
 import streamlit as st
 
 def apply_custom_style():
-    """Injects modern CSS with STRICT text color enforcement."""
+    """Injects modern CSS for shadows, rounded corners, and interactive elements."""
     st.markdown("""
         <style>
-        /* MAIN CONTAINER */
-        .main {
-            background-color: #f8f9fa;
-        }
+        .main { background-color: #f8f9fa; }
         
-        /* 1. METRIC CARDS (The Fix) */
+        /* METRIC CARDS */
         div[data-testid="stMetric"] {
             background-color: #ffffff !important;
             border: 1px solid #e6e6e6;
@@ -17,108 +14,82 @@ def apply_custom_style():
             border-radius: 12px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
-        
-        /* Force Label Color (The title 'Total Value') */
-        div[data-testid="stMetric"] label {
-            color: #6b7280 !important; /* Medium Grey */
-            font-size: 0.9rem !important;
-        }
-        
-        /* Force Value Color (The number '$14,000') */
-        div[data-testid="stMetric"] [data-testid="stMetricValue"] {
-            color: #111827 !important; /* Almost Black */
-            font-weight: 700 !important;
-        }
+        div[data-testid="stMetric"] label { color: #6b7280 !important; font-size: 0.9rem !important; }
+        div[data-testid="stMetric"] [data-testid="stMetricValue"] { color: #111827 !important; font-weight: 700 !important; }
+        div[data-testid="stMetric"] [data-testid="stMetricDelta"] { font-weight: 600 !important; }
 
-        /* Force Delta Color (The small change indicator) */
-        div[data-testid="stMetric"] [data-testid="stMetricDelta"] {
-            font-weight: 600 !important;
-        }
-
-        /* 2. DATAFRAMES */
-        .stDataFrame {
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            border: 1px solid #e5e7eb;
-        }
-
-        /* 3. CUSTOM HEADER CARD */
+        /* HEADER CARD */
         .header-card {
-            background: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
             padding: 2rem;
             border-radius: 1rem;
             color: white;
             margin-bottom: 2rem;
-            box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+            box-shadow: 0 10px 25px -5px rgba(49, 46, 129, 0.4);
         }
-        .header-card h1 {
-            color: white !important;
-            margin: 0;
-            font-family: 'Helvetica Neue', sans-serif;
-            font-weight: 700;
-        }
-        .header-card p {
-            color: #e0e7ff !important;
-            margin-top: 0.5rem;
-            font-size: 1.1rem;
-        }
+        .header-card h1 { color: white !important; margin: 0; font-weight: 700; }
+        .header-card p { color: #a5b4fc !important; margin-top: 0.5rem; font-size: 1.1rem; }
 
-        /* 4. ASSET CARDS (Top Positions) */
-        .asset-card {
-            background-color: white;
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid #e5e7eb;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        /* RISK HERO CARDS */
+        .risk-card {
+            padding: 25px;
+            border-radius: 15px;
+            color: white;
             text-align: center;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
         }
-        .asset-ticker {
-            font-size: 1.2rem;
-            font-weight: 800;
-            color: #111827 !important; /* Force Black */
-            margin-bottom: 5px;
-        }
-        .asset-value {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: #4338ca !important; /* Indigo */
-        }
-        .asset-weight {
-            font-size: 0.9rem;
-            color: #6b7280 !important; /* Grey */
-            background-color: #f3f4f6;
-            padding: 4px 10px;
-            border-radius: 20px;
-            display: inline-block;
-            margin-top: 8px;
+        .risk-card:hover { transform: translateY(-5px); }
+        
+        .winner-card { background: linear-gradient(135deg, #059669 0%, #10b981 100%); }
+        .loser-card { background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); }
+        
+        .risk-title { font-size: 1rem; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+        .risk-ticker { font-size: 3rem; font-weight: 800; margin: 10px 0; }
+        .risk-metric { font-size: 1.5rem; font-weight: 600; background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; display: inline-block; }
+        .risk-desc { margin-top: 10px; font-size: 0.9rem; opacity: 0.9; }
+
+        /* AI SUGGESTION BOX */
+        .ai-box {
+            background-color: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-left: 5px solid #22c55e;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            color: #14532d;
         }
         </style>
     """, unsafe_allow_html=True)
 
 def display_header():
-    """Renders the top banner."""
     st.markdown("""
         <div class="header-card">
-            <h1>Portfolio Analyst Pro</h1>
-            <p>Advanced Conservative Risk Analytics & Performance Tracking</p>
+            <h1>Risk Intelligence</h1>
+            <p>Sharpe Ratio Maximization & Algorithmic Reallocation</p>
         </div>
     """, unsafe_allow_html=True)
 
-def display_top_assets(df):
-    """Renders the top 4 assets as visual cards."""
-    if df.empty: return
+def display_risk_hero(best_row, worst_row):
+    """Displays the massive green/red cards for best/worst assets."""
+    c1, c2 = st.columns(2)
     
-    # Sort by weight descending and take top 4
-    top_assets = df.sort_values('weight', ascending=False).head(4)
-    
-    cols = st.columns(4)
-    for idx, (index, row) in enumerate(top_assets.iterrows()):
-        with cols[idx]:
-            st.markdown(f"""
-            <div class="asset-card">
-                <div class="asset-ticker">{row['ticker']}</div>
-                <div class="asset-value">${row['value']:,.0f}</div>
-                <div class="asset-weight">{row['weight']:.1%} of Portfolio</div>
-            </div>
-            """, unsafe_allow_html=True)
+    with c1:
+        st.markdown(f"""
+        <div class="risk-card winner-card">
+            <div class="risk-title">🏆 Efficiency King</div>
+            <div class="risk-ticker">{best_row['ticker']}</div>
+            <div class="risk-metric">Sharpe {best_row['sharpe']:.2f}</div>
+            <div class="risk-desc">Highest Risk-Adjusted Return</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c2:
+        st.markdown(f"""
+        <div class="risk-card loser-card">
+            <div class="risk-title">⚠️ Drag on Portfolio</div>
+            <div class="risk-ticker">{worst_row['ticker']}</div>
+            <div class="risk-metric">Sharpe {worst_row['sharpe']:.2f}</div>
+            <div class="risk-desc">Lowest Risk-Adjusted Return</div>
+        </div>
+        """, unsafe_allow_html=True)
