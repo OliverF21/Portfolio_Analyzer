@@ -4,21 +4,22 @@ import plotly.express as px
 import os
 from dotenv import load_dotenv
 
-# MODULE IMPORTS
+# --- IMPORTS (The 4 Modules) ---
 from ui import apply_custom_style, display_header, display_top_assets
 from extraction import extract_holdings_from_pdf, parse_manual_data, get_example_csv
 from processing import create_portfolio_df
 from analysis import calculate_risk_metrics, get_portfolio_history
 
-# --- CONFIG & STYLING ---
+# --- 1. SETUP ---
 st.set_page_config(page_title="Portfolio Analyst Pro", layout="wide", page_icon="📈")
 load_dotenv()
 apply_custom_style()
 
-# --- SIDEBAR ---
+# --- 2. SIDEBAR ---
 with st.sidebar:
     st.header("⚙️ Data Source")
     manual_mode = st.toggle("📝 Manual Mode", value=True)
+    
     api_key = os.getenv("GEMINI_API_KEY")
     if not manual_mode and not api_key:
         if "GEMINI_API_KEY" in st.secrets:
@@ -26,10 +27,9 @@ with st.sidebar:
         else:
             st.warning("⚠️ No API Key found.")
 
-# --- MAIN APP ---
+# --- 3. HEADER & DATA LOADING ---
 display_header()
 
-# 1. DATA INGESTION
 raw_holdings = []
 if manual_mode:
     with st.expander("📝 Data Entry (CSV)", expanded=False):
@@ -42,19 +42,18 @@ else:
         with st.spinner("✨ AI is reading your document..."):
             raw_holdings = extract_holdings_from_pdf(uploaded_file, api_key=api_key)
 
+# --- 4. MAIN DASHBOARD ---
 if raw_holdings:
-    # 2. PROCESS
+    # A. Processing
     df = create_portfolio_df(raw_holdings)
     
-    # 3. ANALYZE
+    # B. Analysis
     with st.spinner("🔮 Crunching conservative risk models..."):
         risk_df = calculate_risk_metrics(df)
         final_df = pd.merge(df, risk_df, on='ticker', how='left').fillna(0.0)
         history_series = get_portfolio_history(final_df)
 
-    # --- THE DASHBOARD ---
-    
-    # Top Level KPIs
+    # C. Top Level KPIs
     k1, k2, k3, k4 = st.columns(4)
     weighted_sharpe = (final_df['weight'] * final_df['sharpe']).sum()
     weighted_cagr = (final_df['weight'] * final_df['cagr']).sum()
@@ -68,36 +67,23 @@ if raw_holdings:
 
     st.markdown("---")
 
-    # TABS
+    # D. Tabs
     tab1, tab2, tab3 = st.tabs(["📊 Overview", "💰 Value History", "🔬 Deep Dive"])
 
     with tab1:
-        # HERO SECTION: TOP ASSETS
         st.caption("🏆 Top Positions")
         display_top_assets(final_df)
         st.markdown("<br>", unsafe_allow_html=True) 
 
-        # SPLIT VIEW: RICH TABLE & ALLOCATION
         c1, c2 = st.columns([2, 1])
         with c1:
             st.subheader("All Holdings")
-            
             st.dataframe(
                 final_df,
                 column_config={
                     "ticker": st.column_config.TextColumn("Asset", help="Stock Ticker"),
-                    "value": st.column_config.NumberColumn(
-                        "Market Value",
-                        help="Current Value in USD",
-                        format="$%.2f"
-                    ),
-                    "weight": st.column_config.ProgressColumn(
-                        "Allocation",
-                        help="Portfolio Weight",
-                        format="%.1f%%",
-                        min_value=0,
-                        max_value=1,
-                    ),
+                    "value": st.column_config.NumberColumn("Market Value", format="$%.2f"),
+                    "weight": st.column_config.ProgressColumn("Allocation", format="%.1f%%", min_value=0, max_value=1),
                     "quantity": st.column_config.NumberColumn("Shares", format="%.4f"),
                     "price": st.column_config.NumberColumn("Price", format="$%.2f")
                 },
@@ -119,7 +105,6 @@ if raw_holdings:
         
         if not history_series.empty:
             hist_df = history_series.to_frame(name="Total Value")
-            
             fig_hist = px.area(hist_df, x=hist_df.index, y="Total Value")
             fig_hist.update_layout(
                 xaxis_title="Date", 
@@ -129,7 +114,6 @@ if raw_holdings:
                 yaxis=dict(tickformat="$,.0f"),
                 showlegend=False
             )
-            # Gradient Fill
             fig_hist.update_traces(line_color='#6366f1', fillcolor='rgba(99, 102, 241, 0.2)')
             st.plotly_chart(fig_hist, use_container_width=True)
         else:
@@ -149,4 +133,3 @@ if raw_holdings:
             .background_gradient(subset=['max_drawdown'], cmap="Reds_r"),
             use_container_width=True
         )
-        

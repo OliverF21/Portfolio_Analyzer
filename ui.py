@@ -1,12 +1,13 @@
 import streamlit as st
 
 def apply_custom_style():
-    """Injects modern CSS with STRICT text color enforcement."""
+    """Injects CSS to fix contrast issues and style the dashboard."""
     st.markdown("""
         <style>
+        /* 1. BACKGROUNDS */
         .main { background-color: #f8f9fa; }
         
-        /* METRIC CARDS */
+        /* 2. METRIC CARDS (Fixed Contrast) */
         div[data-testid="stMetric"] {
             background-color: #ffffff !important;
             border: 1px solid #e6e6e6;
@@ -14,13 +15,14 @@ def apply_custom_style():
             border-radius: 12px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
-        
-        /* FORCE DARK TEXT ON CARDS */
+        /* Metric Label (Grey) */
         div[data-testid="stMetric"] label { color: #6b7280 !important; font-size: 0.9rem !important; }
+        /* Metric Value (Black) */
         div[data-testid="stMetric"] [data-testid="stMetricValue"] { color: #111827 !important; font-weight: 700 !important; }
+        /* Metric Delta (Green/Red) */
         div[data-testid="stMetric"] [data-testid="stMetricDelta"] { font-weight: 600 !important; }
 
-        /* DATAFRAMES */
+        /* 3. DATAFRAMES */
         .stDataFrame {
             border-radius: 12px;
             overflow: hidden;
@@ -28,7 +30,7 @@ def apply_custom_style():
             border: 1px solid #e5e7eb;
         }
 
-        /* HEADER */
+        /* 4. HEADER BANNER */
         .header-card {
             background: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
             padding: 2rem;
@@ -40,7 +42,7 @@ def apply_custom_style():
         .header-card h1 { color: white !important; margin: 0; font-weight: 700; }
         .header-card p { color: #e0e7ff !important; margin-top: 0.5rem; font-size: 1.1rem; }
 
-        /* ASSET CARDS */
+        /* 5. TOP ASSET CARDS */
         .asset-card {
             background-color: white;
             padding: 20px;
@@ -64,6 +66,7 @@ def display_header():
     """, unsafe_allow_html=True)
 
 def display_top_assets(df):
+    """Renders the top 4 holdings as visual cards."""
     if df.empty: return
     top_assets = df.sort_values('weight', ascending=False).head(4)
     cols = st.columns(4)

@@ -7,7 +7,6 @@ from google import genai
 from google.genai import types
 
 def get_example_csv():
-    """Returns the default example portfolio as a CSV string."""
     return """ticker, quantity
 AMD, 1.090641
 AMZN, 2.239950
@@ -44,26 +43,16 @@ VUG, 0.285199
 WMT, 6.547545"""
 
 def parse_manual_data(csv_text):
-    """Parses raw CSV text into the standard list-of-dicts format."""
     try:
         df = pd.read_csv(io.StringIO(csv_text))
-        
-        # Normalize headers
         df.columns = [c.lower().strip() for c in df.columns]
-        
-        # Map common header variations
         rename_map = {'symbol': 'ticker', 'qty': 'quantity', 'shares': 'quantity'}
         df.rename(columns=rename_map, inplace=True)
-        
-        if 'ticker' not in df.columns or 'quantity' not in df.columns:
-            return []
-
+        if 'ticker' not in df.columns or 'quantity' not in df.columns: return []
         return df[['ticker', 'quantity']].to_dict('records')
-    except Exception:
-        return []
+    except: return []
 
 def extract_holdings_from_pdf(file_obj, api_key=None):
-    """Extracts raw holding data from a PDF file object using Gemini."""
     try:
         full_text = ""
         with pdfplumber.open(file_obj) as pdf:
@@ -85,7 +74,5 @@ def extract_holdings_from_pdf(file_obj, api_key=None):
             )
             data = json.loads(response.text)
             return data.get('holdings', [])
-    except:
-        return []
+    except: return []
     return []
-
