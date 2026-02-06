@@ -1,11 +1,10 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from scipy.stats import gmean
 
 def calculate_risk_metrics(df):
     """
-    Strict Geometric Sharpe Algorithm:
+    Strict Geometric Sharpe Algorithm (NumPy Version):
     1. Returns: Geometric Mean of Daily Returns (Annualized).
     2. Volatility: Standard Deviation of Daily Returns (Annualized).
     3. Risk-Free Rate: Fixed at 4.26%.
@@ -16,7 +15,7 @@ def calculate_risk_metrics(df):
     metrics = []
     tickers = df['ticker'].tolist()
     
-    # 1. Fetch 3 Years of DAILY Data (Crucial for Daily Geom Mean)
+    # 1. Fetch 3 Years of DAILY Data
     try:
         data = yf.download(
             tickers, 
@@ -47,10 +46,9 @@ def calculate_risk_metrics(df):
             daily_rets = hist.pct_change().dropna()
             
             # --- STEP 2: GEOMETRIC MEAN (The "Conservatism" Component) ---
-            # Formula: (Product(1 + r))^(1/n) - 1
-            # We use scipy.stats.gmean for precision
-            # We add 1 to returns because gmean requires positive numbers
-            daily_geo_mean = gmean(daily_rets + 1) - 1
+            # Formula: exp(mean(log(1 + r))) - 1
+            # We use numpy math instead of scipy to prevent import errors
+            daily_geo_mean = np.exp(np.mean(np.log(1 + daily_rets))) - 1
             
             # Annualize: (1 + daily_geo)^252 - 1
             annualized_return = (1 + daily_geo_mean)**252 - 1
@@ -122,3 +120,4 @@ def get_portfolio_history(df):
     except Exception as e:
         print(f"History fetch error: {e}")
         return pd.Series()
+    
