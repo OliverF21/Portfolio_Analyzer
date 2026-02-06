@@ -1,7 +1,7 @@
 import streamlit as st
 
 def apply_custom_style():
-    """Injects CSS to fix contrast issues and style the dashboard."""
+    """Injects modern CSS for shadows, rounded corners, and interactive elements."""
     st.markdown("""
         <style>
         /* 1. BACKGROUNDS */
@@ -15,11 +15,8 @@ def apply_custom_style():
             border-radius: 12px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
-        /* Metric Label (Grey) */
         div[data-testid="stMetric"] label { color: #6b7280 !important; font-size: 0.9rem !important; }
-        /* Metric Value (Black) */
         div[data-testid="stMetric"] [data-testid="stMetricValue"] { color: #111827 !important; font-weight: 700 !important; }
-        /* Metric Delta (Green/Red) */
         div[data-testid="stMetric"] [data-testid="stMetricDelta"] { font-weight: 600 !important; }
 
         /* 3. DATAFRAMES */
@@ -42,7 +39,7 @@ def apply_custom_style():
         .header-card h1 { color: white !important; margin: 0; font-weight: 700; }
         .header-card p { color: #e0e7ff !important; margin-top: 0.5rem; font-size: 1.1rem; }
 
-        /* 5. TOP ASSET CARDS */
+        /* 5. ASSET CARDS */
         .asset-card {
             background-color: white;
             padding: 20px;
@@ -61,7 +58,7 @@ def display_header():
     st.markdown("""
         <div class="header-card">
             <h1>Portfolio Analyst Pro</h1>
-            <p>Advanced Conservative Risk Analytics & Performance Tracking</p>
+            <p>Advanced Risk Analytics & Sharpe Optimization</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -79,4 +76,3 @@ def display_top_assets(df):
                 <div class="asset-weight">{row['weight']:.1%} of Portfolio</div>
             </div>
             """, unsafe_allow_html=True)
-            

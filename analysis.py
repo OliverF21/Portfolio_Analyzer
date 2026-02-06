@@ -6,106 +6,78 @@ def calculate_risk_metrics(df):
     """
     INDUSTRY STANDARD 3-YEAR SHARPE CALCULATOR
     ------------------------------------------
-    Methodology:
-    1. Horizon: 3 Years (36 Months).
-    2. Frequency: Monthly Returns (Resampled from Daily).
-       - Why? Daily data is too noisy for strategic ratios. Standard fact sheets use monthly.
+    1. Horizon: 3 Years.
+    2. Frequency: Monthly Returns.
     3. Return Metric: Arithmetic Mean (Annualized).
-       - Why? Geometric mean is for wealth compounding; Arithmetic is for statistical expectation (Sharpe standard).
-    4. Risk-Free Rate: 4.26% (Fixed Hurdle).
+    4. Risk-Free Rate: 4.26%.
     """
-    
-    # --- 1. SAFETY CHECKS ---
-    # Ensure we have a valid dataframe with a 'ticker' column
     if df.empty or 'ticker' not in df.columns:
         return pd.DataFrame()
 
     metrics = []
     tickers = df['ticker'].tolist()
     
-    # --- 2. DATA INGESTION (NO SHORTCUTS) ---
-    # We fetch daily data first, then resample. This is more accurate than fetching "1mo" 
-    # intervals directly because yfinance monthly data can sometimes behave oddly with dividends.
+    # 1. DATA INGESTION
     try:
         data = yf.download(
             tickers, 
-            period="3y",      # Explicit 3-Year Lookback
+            period="3y", 
             group_by='ticker', 
-            auto_adjust=True, # Critical: Includes Dividends in the price (Total Return)
+            auto_adjust=True, # Total Return
             progress=False
         )
     except:
         return pd.DataFrame()
 
-    # --- 3. TICKER-BY-TICKER ANALYSIS ---
     for t in tickers:
         try:
-            # A. Extract Series
-            # Handle multi-index dataframe structure safely
             if len(tickers) > 1:
                 hist = data[t]['Close']
             else:
                 hist = data['Close']
             
-            # B. Clean Data
-            # Remove NaN values that might exist at the start/end
             hist = hist.dropna()
             
-            # C. Validation
-            # A 3-Year monthly calculation needs ~36 months. 
-            # If we have less than 24 months (2 years) of daily data, the metric is statistically junk.
-            if len(hist) < 500: # approx 2 trading years
-                raise ValueError("Insufficient Data (Less than 2y history)")
+            # Validation (Need ~2y of daily data to make a 3y monthly valid)
+            if len(hist) < 500: 
+                raise ValueError("Insufficient Data")
 
-            # --- 4. RESAMPLING (THE STANDARD TECHNIQUE) ---
-            # We convert Daily Price -> Monthly Ending Price.
-            # 'ME' stands for Month End.
+            # 2. RESAMPLING TO MONTHLY
             hist_monthly = hist.resample('ME').last().dropna()
-
-            # --- 5. CALCULATE RETURNS ---
-            # Percentage change between months.
             monthly_rets = hist_monthly.pct_change().dropna()
             
             if len(monthly_rets) < 24:
                 raise ValueError("Insufficient Monthly Data")
 
-            # --- 6. ARITHMETIC MEAN RETURN (ANNUALIZED) ---
-            # Standard Formula: Average Monthly Return * 12
-            # Note: We do NOT use Geometric mean here, as standard Sharpe uses Arithmetic expected return.
+            # 3. ARITHMETIC MEAN RETURN (ANNUALIZED)
             avg_monthly_ret = monthly_rets.mean()
             annualized_return = avg_monthly_ret * 12
 
-            # --- 7. VOLATILITY (ANNUALIZED) ---
-            # Standard Formula: Std Dev of Monthly Returns * Sqrt(12)
+            # 4. VOLATILITY (ANNUALIZED)
             std_dev_monthly = monthly_rets.std()
             annualized_vol = std_dev_monthly * np.sqrt(12)
             
-            # --- 8. SHARPE RATIO CALCULATION ---
-            # Formula: (Expected Return - Risk Free Rate) / Volatility
-            rf_rate = 0.0426 # User Constraint: 4.26%
-            
+            # 5. SHARPE RATIO
+            rf_rate = 0.0426
             if annualized_vol > 0:
                 sharpe = (annualized_return - rf_rate) / annualized_vol
             else:
                 sharpe = 0.0
 
-            # --- 9. CONTEXTUAL METRICS (Drawdown) ---
-            # We use the daily data for this to catch intra-month crashes
+            # 6. DRAWDOWN
             rolling_max = hist.cummax()
             drawdown = (hist - rolling_max) / rolling_max
             max_drawdown = drawdown.min()
 
-            # --- 10. PACKAGING ---
             metrics.append({
                 "ticker": t,
                 "sharpe": float(sharpe),
                 "volatility": float(annualized_vol),
-                "cagr": float(annualized_return), # Labeled CAGR for UI consistency, but acts as Exp. Return
+                "cagr": float(annualized_return),
                 "max_drawdown": float(max_drawdown)
             })
             
         except:
-            # Fallback for new IPOs or errors
             metrics.append({
                 "ticker": t, "sharpe": 0.0, "volatility": 0.0, 
                 "cagr": 0.0, "max_drawdown": 0.0
@@ -114,32 +86,47 @@ def calculate_risk_metrics(df):
     return pd.DataFrame(metrics)
 
 def get_portfolio_history(df):
-    """
-    Reconstructs the 2-Year historical value of the *current* portfolio 
-    quantity held constant.
-    """
+    """Reconstructs historical value of current portfolio."""
     if df.empty: return pd.Series()
-    
     tickers = df['ticker'].tolist()
     quantities = dict(zip(df['ticker'], df['quantity']))
-    
     try:
-        # Fetch 2y daily history for the visualization
         data = yf.download(tickers, period="2y", auto_adjust=True, progress=False)['Close']
-        
-        if isinstance(data, pd.Series): 
-            data = data.to_frame(name=tickers[0])
-            
+        if isinstance(data, pd.Series): data = data.to_frame(name=tickers[0])
         data = data.ffill().dropna()
-
         portfolio_history = pd.Series(0.0, index=data.index)
-        
         for t in tickers:
             if t in data.columns:
                 portfolio_history += data[t] * quantities.get(t, 0)
-                
         return portfolio_history
-        
-    except Exception as e:
-        print(f"History fetch error: {e}")
-        return pd.Series()
+    except: return pd.Series()
+
+def get_correlation_matrix(df):
+    """Fetches correlation data to identify diversification opportunities."""
+    tickers = df['ticker'].tolist()
+    try:
+        data = yf.download(tickers, period="1y", auto_adjust=True, progress=False)['Close']
+        if len(tickers) == 1: return pd.DataFrame()
+        # Calculate correlation of daily returns
+        corr_matrix = data.pct_change().corr()
+        return corr_matrix
+    except:
+        return pd.DataFrame()
+
+def get_optimization_suggestions(df):
+    """
+    Identifies 'Drag' (Low Sharpe) and 'Boost' (High Sharpe) candidates.
+    Returns two DataFrames: to_trim, to_boost
+    """
+    if df.empty or 'sharpe' not in df.columns: return pd.DataFrame(), pd.DataFrame()
+    
+    # Calculate Weighted Average Sharpe of the Portfolio
+    avg_sharpe = df['sharpe'].mean()
+    
+    # Identify inefficient assets (Sharpe < Average) & (Weight > 1%)
+    to_trim = df[(df['sharpe'] < avg_sharpe) & (df['weight'] > 0.01)].sort_values('sharpe', ascending=True)
+    
+    # Identify efficiency leaders (Sharpe > Average)
+    to_boost = df[df['sharpe'] > avg_sharpe].sort_values('sharpe', ascending=False)
+    
+    return to_trim, to_boost
