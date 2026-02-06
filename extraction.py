@@ -9,13 +9,39 @@ from google.genai import types
 def get_example_csv():
     """Returns the default example portfolio as a CSV string."""
     return """ticker, quantity
-AAPL, 50
-MSFT, 20
-NVDA, 10
-GOOGL, 15
-AMZN, 10
-TSLA, 15
-JPM, 25"""
+AMD, 1.090641
+AMZN, 2.239950
+BABA, 0.597157
+BRK.B, 0.094141
+COST, 0.183930
+D, 0.898666
+FIG, 1.193170
+GLD, 1.764702
+GOOGL, 1.008079
+HOOD, 2.446729
+INTC, 4.052924
+ITA, 1.107081
+LMT, 0.212240
+MDLN, 1.000000
+MSFT, 1.196164
+NVDA, 10.861051
+NVDY, 9.129890
+OKLO, 1.049747
+PLTR, 0.570360
+QQQ, 0.465272
+RGTI, 4.413720
+RHHBY, 4.000000
+SLV, 6.178850
+SPYG, 13.379623
+TJX, 0.385498
+TSM, 4.472605
+UBER, 2.701419
+URNM, 1.224473
+VGK, 0.718596
+VOO, 4.060522
+VST, 0.406087
+VUG, 0.285199
+WMT, 6.547545"""
 
 def parse_manual_data(csv_text):
     """Parses raw CSV text into the standard list-of-dicts format."""
@@ -62,3 +88,4 @@ def extract_holdings_from_pdf(file_obj, api_key=None):
     except:
         return []
     return []
+

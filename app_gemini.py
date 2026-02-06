@@ -4,106 +4,117 @@ import plotly.express as px
 import os
 from dotenv import load_dotenv
 
-# IMPORT MODULES
+# MODULE IMPORTS
+from ui import apply_custom_style, display_header
 from extraction import extract_holdings_from_pdf, parse_manual_data, get_example_csv
 from processing import create_portfolio_df
-from analysis import calculate_risk_metrics
+from analysis import calculate_risk_metrics, get_comparative_performance
 
-# --- CONFIG ---
-st.set_page_config(page_title="Modular Portfolio Analyzer", layout="wide")
+# --- CONFIG & STYLING ---
+st.set_page_config(page_title="Portfolio Analyst Pro", layout="wide", page_icon="📈")
 load_dotenv()
+apply_custom_style() # INJECT CSS
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.header("⚙️ Configuration")
-    manual_mode = st.toggle("📝 Manual Data / CSV Mode", value=True)
+    st.header("⚙️ Data Source")
+    manual_mode = st.toggle("📝 Manual Mode", value=True)
     
     api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key and "GEMINI_API_KEY" in st.secrets:
-        api_key = st.secrets["GEMINI_API_KEY"]
-    
     if not manual_mode and not api_key:
-        st.warning("⚠️ No API Key found for PDF extraction.")
+        if "GEMINI_API_KEY" in st.secrets:
+            api_key = st.secrets["GEMINI_API_KEY"]
+        else:
+            st.warning("⚠️ No API Key found.")
 
-# --- MAIN UI ---
-st.title("Sharpe Ratio Analysis Dashboard")
+# --- MAIN APP ---
+display_header()
 
+# 1. DATA INGESTION
 raw_holdings = []
-
-# PHASE 1: DATA ENTRY
 if manual_mode:
-    st.info("Edit your portfolio CSV below (Ticker, Quantity).")
-    csv_input = st.text_area("CSV Data", value=get_example_csv(), height=200)
-    
-    if st.button("🚀 Load Manual Data"):
-        with st.spinner("Parsing CSV..."):
+    with st.expander("📝 Data Entry (CSV)", expanded=True):
+        csv_input = st.text_area("Paste Holdings", value=get_example_csv(), height=150)
+        if st.button("🚀 Analyze Portfolio", type="primary"):
             raw_holdings = parse_manual_data(csv_input)
-            if not raw_holdings:
-                st.error("Could not parse CSV. Please check format.")
-                st.stop()
-            st.success(f"Loaded {len(raw_holdings)} rows from CSV.")
 else:
     uploaded_file = st.file_uploader("Upload Robinhood PDF", type="pdf")
-    if uploaded_file:
-        if not api_key:
-            st.error("API Key required for PDF Mode.")
-            st.stop()
-            
-        with st.spinner("Extracting data from PDF..."):
+    if uploaded_file and api_key:
+        with st.spinner("✨ AI is reading your document..."):
             raw_holdings = extract_holdings_from_pdf(uploaded_file, api_key=api_key)
-            if not raw_holdings:
-                st.error("Extraction Failed. Try Manual Mode.")
-                st.stop()
-            st.success(f"Extracted {len(raw_holdings)} positions.")
 
-# PHASE 2 & 3: PROCESSING & ANALYSIS
 if raw_holdings:
     # 2. PROCESS
     df = create_portfolio_df(raw_holdings)
     
     # 3. ANALYZE
-    with st.spinner("Calculating Risk Metrics (Live)..."):
+    with st.spinner("🔮 Crunching conservative risk models..."):
         risk_df = calculate_risk_metrics(df)
         final_df = pd.merge(df, risk_df, on='ticker', how='left').fillna(0.0)
+        perf_data = get_comparative_performance(final_df['ticker'].tolist())
 
-    # --- DASHBOARD ---
-    st.divider()
-    col1, col2 = st.columns([1, 2])
+    # --- THE DASHBOARD ---
     
-    with col1:
-        st.subheader("📋 Holdings")
-        st.dataframe(final_df[['ticker', 'quantity', 'value', 'weight']].style.format({
-            "value": "${:,.2f}",
-            "weight": "{:.1%}"
-        }))
-        
-    with col2:
-        st.subheader("🍰 Allocation")
-        fig = px.pie(final_df, values='value', names='ticker', title="Portfolio Weight")
-        st.plotly_chart(fig, use_container_width=True)
-
-    st.divider()
-    st.subheader("📉 Risk Analysis")
-    
+    # Top Level KPIs
+    k1, k2, k3, k4 = st.columns(4)
     weighted_sharpe = (final_df['weight'] * final_df['sharpe']).sum()
-    
-    k1, k2, k3 = st.columns(3)
-    k1.metric("Portfolio Sharpe", f"{weighted_sharpe:.2f}")
-    
-    if not final_df.empty:
-        best = final_df.loc[final_df['sharpe'].idxmax()]
-        k2.metric("Best Asset", best['ticker'], f"{best['sharpe']:.2f}")
-        worst = final_df.loc[final_df['sharpe'].idxmin()]
-        k3.metric("Laggard", worst['ticker'], f"{worst['sharpe']:.2f}")
+    weighted_cagr = (final_df['weight'] * final_df['cagr']).sum()
+    total_val = final_df['value'].sum()
+    worst_dd = final_df['max_drawdown'].min()
 
-    st.dataframe(
-        final_df[['ticker', 'weight', 'annual_return', 'volatility', 'sharpe']]
-        .sort_values('sharpe', ascending=False)
-        .style.format({
-            "weight": "{:.1%}",
-            "annual_return": "{:.1%}",
-            "volatility": "{:.1%}",
-            "sharpe": "{:.2f}"
-        })
-        .background_gradient(subset=['sharpe'], cmap="RdYlGn")
-    )
+    k1.metric("Total Value", f"${total_val:,.0f}")
+    k2.metric("Portfolio Sharpe", f"{weighted_sharpe:.2f}", help="Risk-Adj Return (Target > 1.0)")
+    k3.metric("Exp. Annual Return", f"{weighted_cagr:.1%}", help="CAGR (Total Return)")
+    k4.metric("Max Drawdown", f"{worst_dd:.1%}", help="Worst crash in portfolio")
+
+    st.markdown("---")
+
+    # TABS
+    tab1, tab2, tab3 = st.tabs(["📊 Overview", "📈 Price Performance", "🔬 Deep Dive"])
+
+    with tab1:
+        c1, c2 = st.columns([1.5, 1])
+        with c1:
+            st.subheader("Holdings Breakdown")
+            st.dataframe(
+                final_df[['ticker', 'quantity', 'value', 'weight']].style.format({
+                    "value": "${:,.2f}", "weight": "{:.1%}"
+                }), use_container_width=True, height=400
+            )
+        with c2:
+            st.subheader("Allocation")
+            fig = px.pie(final_df, values='value', names='ticker', hole=0.4, color_discrete_sequence=px.colors.qualitative.Plotly)
+            st.plotly_chart(fig, use_container_width=True)
+
+    with tab2:
+        st.subheader("Time Machine: Compare Performance (2 Years)")
+        st.caption("This chart normalizes all assets to start at 0%, showing true relative growth (Total Return).")
+        
+        if not perf_data.empty:
+            fig_perf = px.line(perf_data, x=perf_data.index, y=perf_data.columns)
+            fig_perf.update_layout(
+                xaxis_title="Date", 
+                yaxis_title="Total Return (%)",
+                hovermode="x unified",
+                legend_title="Asset",
+                height=500,
+                yaxis=dict(tickformat=".0%")
+            )
+            st.plotly_chart(fig_perf, use_container_width=True)
+        else:
+            st.warning("Could not fetch historical data for comparison.")
+
+    with tab3:
+        st.subheader("Risk Lab")
+        st.caption("Conservative Metrics: 5% Risk-Free Rate, Total Return (Dividends Included).")
+        st.dataframe(
+            final_df[['ticker', 'weight', 'cagr', 'volatility', 'max_drawdown', 'sharpe']]
+            .sort_values('sharpe', ascending=False)
+            .style.format({
+                "weight": "{:.1%}", "cagr": "{:.1%}", "volatility": "{:.1%}", 
+                "max_drawdown": "{:.1%}", "sharpe": "{:.2f}"
+            })
+            .background_gradient(subset=['sharpe'], cmap="RdYlGn")
+            .background_gradient(subset=['max_drawdown'], cmap="Reds_r"),
+            use_container_width=True
+        )
