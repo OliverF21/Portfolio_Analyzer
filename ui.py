@@ -1,37 +1,49 @@
 import streamlit as st
 
 def apply_custom_style():
-    """Injects modern CSS for shadows, rounded corners, and interactive elements."""
+    """Injects modern CSS with STRICT text color enforcement."""
     st.markdown("""
         <style>
-        /* MAIN CONTAINER BACKGROUND */
+        /* MAIN CONTAINER */
         .main {
             background-color: #f8f9fa;
         }
         
-        /* METRIC CARDS */
+        /* 1. METRIC CARDS (The Fix) */
         div[data-testid="stMetric"] {
-            background-color: #ffffff;
+            background-color: #ffffff !important;
             border: 1px solid #e6e6e6;
             padding: 15px 20px;
             border-radius: 12px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            transition: all 0.2s ease;
         }
-        div[data-testid="stMetric"]:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            border-color: #6366f1;
+        
+        /* Force Label Color (The title 'Total Value') */
+        div[data-testid="stMetric"] label {
+            color: #6b7280 !important; /* Medium Grey */
+            font-size: 0.9rem !important;
+        }
+        
+        /* Force Value Color (The number '$14,000') */
+        div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+            color: #111827 !important; /* Almost Black */
+            font-weight: 700 !important;
         }
 
-        /* DATAFRAMES */
+        /* Force Delta Color (The small change indicator) */
+        div[data-testid="stMetric"] [data-testid="stMetricDelta"] {
+            font-weight: 600 !important;
+        }
+
+        /* 2. DATAFRAMES */
         .stDataFrame {
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid #e5e7eb;
         }
 
-        /* CUSTOM HEADER CARD */
+        /* 3. CUSTOM HEADER CARD */
         .header-card {
             background: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
             padding: 2rem;
@@ -47,12 +59,12 @@ def apply_custom_style():
             font-weight: 700;
         }
         .header-card p {
-            color: #e0e7ff;
+            color: #e0e7ff !important;
             margin-top: 0.5rem;
             font-size: 1.1rem;
         }
 
-        /* ASSET CARDS */
+        /* 4. ASSET CARDS (Top Positions) */
         .asset-card {
             background-color: white;
             padding: 20px;
@@ -64,17 +76,17 @@ def apply_custom_style():
         .asset-ticker {
             font-size: 1.2rem;
             font-weight: 800;
-            color: #111827;
+            color: #111827 !important; /* Force Black */
             margin-bottom: 5px;
         }
         .asset-value {
             font-size: 1.5rem;
             font-weight: 600;
-            color: #4338ca;
+            color: #4338ca !important; /* Indigo */
         }
         .asset-weight {
             font-size: 0.9rem;
-            color: #6b7280;
+            color: #6b7280 !important; /* Grey */
             background-color: #f3f4f6;
             padding: 4px 10px;
             border-radius: 20px;
