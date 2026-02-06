@@ -26,7 +26,7 @@ with st.sidebar:
         st.warning("⚠️ No API Key found for PDF extraction.")
 
 # --- MAIN UI ---
-st.title("🧩 Modular Portfolio Analyzer")
+st.title("Sharpe Ratio Analysis Dashboard")
 
 raw_holdings = []
 

@@ -44,9 +44,9 @@ def calculate_risk_metrics(df):
             ann_return = monthly_rets.mean() * 12
             ann_vol = monthly_rets.std() * np.sqrt(12)
             
-            # 5. Sharpe (Risk Free Rate = 4% default)
+            # 5. Sharpe (Risk Free Rate = 4.26% default)
             if ann_vol > 0:
-                sharpe = (ann_return - 0.04) / ann_vol
+                sharpe = (ann_return - 0.0426) / ann_vol
             else:
                 sharpe = 0.0
             
