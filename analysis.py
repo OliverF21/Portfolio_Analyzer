@@ -8,6 +8,7 @@ def calculate_risk_metrics(df):
     1. Returns: Geometric Mean of Daily Returns (Annualized).
     2. Volatility: Standard Deviation of Daily Returns (Annualized).
     3. Risk-Free Rate: Fixed at 4.26%.
+    4. Data: Up to 10 Years of History (for reliable long-term estimates).
     """
     if df.empty or 'ticker' not in df.columns:
         return pd.DataFrame()
@@ -15,11 +16,11 @@ def calculate_risk_metrics(df):
     metrics = []
     tickers = df['ticker'].tolist()
     
-    # 1. Fetch 3 Years of DAILY Data
+    # 1. Fetch 10 Years of DAILY Data
     try:
         data = yf.download(
             tickers, 
-            period="3y", 
+            period="10y",   # <--- UPDATED: 10 Years
             group_by='ticker', 
             auto_adjust=True, # Total Return
             progress=False
@@ -38,22 +39,22 @@ def calculate_risk_metrics(df):
             # Drop missing data
             hist = hist.dropna()
             
-            # Need meaningful history
+            # Need meaningful history (at least ~1 year)
             if len(hist) < 200: 
                 raise ValueError("Insufficient Data")
 
             # --- STEP 1: DAILY RETURNS ---
             daily_rets = hist.pct_change().dropna()
             
-            # --- STEP 2: GEOMETRIC MEAN (The "Conservatism" Component) ---
+            # --- STEP 2: GEOMETRIC MEAN (Conservatism) ---
             # Formula: exp(mean(log(1 + r))) - 1
-            # We use numpy math instead of scipy to prevent import errors
+            # Using numpy to avoid scipy dependency
             daily_geo_mean = np.exp(np.mean(np.log(1 + daily_rets))) - 1
             
             # Annualize: (1 + daily_geo)^252 - 1
             annualized_return = (1 + daily_geo_mean)**252 - 1
 
-            # --- STEP 3: VOLATILITY (Std Dev from Mean) ---
+            # --- STEP 3: VOLATILITY ---
             # Annualize: Daily Std * Sqrt(252)
             annualized_vol = daily_rets.std() * np.sqrt(252)
             
@@ -66,7 +67,7 @@ def calculate_risk_metrics(df):
             else:
                 sharpe = 0.0
 
-            # --- METRIC 5: MAX DRAWDOWN (Kept for context) ---
+            # --- METRIC 5: MAX DRAWDOWN ---
             rolling_max = hist.cummax()
             drawdown = (hist - rolling_max) / rolling_max
             max_drawdown = drawdown.min()
@@ -75,7 +76,7 @@ def calculate_risk_metrics(df):
                 "ticker": t,
                 "sharpe": float(sharpe),
                 "volatility": float(annualized_vol),
-                "cagr": float(annualized_return), # Labeling as CAGR for display consistency
+                "cagr": float(annualized_return), 
                 "max_drawdown": float(max_drawdown)
             })
             
@@ -98,7 +99,8 @@ def get_portfolio_history(df):
     quantities = dict(zip(df['ticker'], df['quantity']))
     
     try:
-        # Fetch 2y daily history
+        # Fetch 2y daily history for the chart (Visualization purposes)
+        # Note: We keep chart at 2y to avoid visual noise from newer assets (like NVDY) dropping to 0
         data = yf.download(tickers, period="2y", auto_adjust=True, progress=False)['Close']
         
         # Handle single ticker case
